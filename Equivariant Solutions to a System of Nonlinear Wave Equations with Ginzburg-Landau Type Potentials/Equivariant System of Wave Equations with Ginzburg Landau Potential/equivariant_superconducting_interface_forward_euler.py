@@ -1,0 +1,171 @@
+# this is a numerical simulation of the 1d wave equation Phi_tt - Phi_rr - 1/r*Phi_r + 1/epsilon^2*nabla_Phi V(Phi) = 0
+
+import numpy as np
+from scipy import exp
+# from pylab import *
+from matplotlib.pylab import *
+import csv as csv
+
+
+
+# This is the plotting function
+def save_graph(x,filename,f,s,limits,n):
+    figure()
+    axis(limits)
+    
+    line1, = plot(x,x,'b')
+    line2, = plot(x,x,'r')
+
+    for i in range(0,n):
+	line1.set_ydata(f[i])
+	line2.set_ydata(s[i])
+	draw()
+        savefig("graphs/" + '%s%04d' % (filename, i) + ".png")
+	if i == 0*n/10:
+		print "[>          ]"
+	elif i == 1*n/10:
+		print "[->         ]"
+	elif i == 2*n/10:
+		print "[-->        ]"
+	elif i == 3*n/10:
+		print "[--->       ]"
+	elif i == 4*n/10:
+		print "[---->      ]"
+	elif i == 5*n/10:
+		print "[----->     ]"
+	elif i == 6*n/10:
+		print "[------>    ]"
+	elif i == 7*n/10:
+		print "[------->   ]"
+	elif i == 8*n/10:
+		print "[-------->  ]"
+	elif i == 9*n/10:
+		print "[---------> ]"
+	elif i == 10*n/10:
+		print "[---------->]"
+
+
+# domain = [a,b]
+# spatial axis: let dr = |[a,b]|/m = (b-a)/m, where m is the number of divisions of the spatial axis
+a = 9.
+b = 11.
+m = 5000
+dr = (b-a)/m
+mid = (b+a)/2.
+
+# we will discritize the interval [a,b] into m equally sized intervals and this will be the spatial lattice we will do the numerics on
+pts = np.arange(a,b + dr/2.,dr)
+
+# time steps
+dt = 0.00001
+
+# a common quantity that shows up (dt/dr)^2
+cfl = (dt/dr)**2
+
+# epsilon parameter
+epsilon = 1./50.
+
+# initialize counter and choose number of time steps
+i = 1
+maxiter = 5000
+
+# parameters showing up in our model
+beta = 1.25
+lambda_f = 2.
+lambda_s = 1.
+phase = 50.*epsilon
+B = ( (lambda_f - beta)/2. )**0.5
+
+# we set the initial data for f here. For convenience we use: f_0 = hyperbolic tangent and partial_t f_0 approx epsilon
+data_first_f = csv.reader(open('first_f.csv','rb'))
+temp_first_f = []
+for row in data_first_f:
+	temp_first_f.append(row)
+
+temp_first_f = np.array(temp_first_f)
+first_f = []
+
+for j in range(0,np.size(temp_first_f)):
+	first_f.append(float(temp_first_f[j][0])) 
+
+f0 = np.array(first_f)*1.
+
+data_second_f = csv.reader(open('second_f.csv','rb'))
+temp_second_f = []
+for row in data_second_f:
+	temp_second_f.append(row)
+
+temp_second_f = np.array(temp_second_f)
+second_f = []
+
+for j in range(0,np.size(temp_second_f)):
+	second_f.append(float(temp_second_f[j][0])) 
+
+f1 = np.array(second_f)*1.
+
+f2 = f1*1.
+
+f = []
+f.append(f0*1.)
+f.append(f1*1.)
+
+# we set the initial data for s here. For convenience we use: s_0 = hyperbolic cosecant and partial_t s_0 = 0
+data_first_s = csv.reader(open('first_s.csv','rb'))
+temp_first_s = []
+for row in data_first_s:
+	temp_first_s.append(row)
+
+temp_first_s = np.array(temp_first_s)
+first_s = []
+
+for j in range(0,np.size(temp_first_s)):
+	first_s.append(float(temp_first_s[j][0])) 
+
+s0 = np.array(first_s)*1.
+
+data_second_s = csv.reader(open('second_s.csv','rb'))
+temp_second_s = []
+for row in data_second_s:
+	temp_second_s.append(row)
+
+temp_second_s = np.array(temp_second_s)
+second_s = []
+
+for j in range(0,np.size(temp_second_s)):
+	second_s.append(float(temp_second_s[j][0])) 
+
+s1 = np.array(second_s)*1.
+
+s2 = s1*1.
+
+s = []
+s.append(s0*1.)
+s.append(s1*1.)
+
+# forward method (i.e. for the next time step, a position only depends on the values of the 2 previous time steps and not on any of its neighbours
+
+while (i <= maxiter):
+
+	for j in range(1,m):
+		f2[j] = 2.*f1[j] - f0[j] + (cfl/pts[j])*( (pts[j] + dr/2.)*f1[j+1] - 2.*pts[j]*f1[j] + (pts[j] - dr/2.)*f1[j-1] ) - ((dt/epsilon)**2.)*( lambda_f*(f1[j]**2. - 1.)*f1[j] + beta*(s1[j]**2.)*f1[j] )
+		s2[j] = 2.*s1[j] - s0[j] + (cfl/pts[j])*( (pts[j] + dr/2.)*s1[j+1] - 2.*pts[j]*s1[j] + (pts[j] - dr/2.)*s1[j-1] ) - ((dt/epsilon)**2.)*( lambda_s*(s1[j]**2. - 1.)*s1[j] + beta*(f1[j]**2.)*s1[j] + (phase**2.)/((pts[j]**2.))*s1[j] )
+	
+	# Neumann boundary conditions
+	f2[0] = 2.*f1[0] - f0[0] + (cfl/pts[0])*( (pts[0] + dr/2.)*f1[1] - 2.*pts[0]*f1[0] + (pts[0] - dr/2.)*f1[0] ) - ((dt/epsilon)**2.)*( lambda_f*(f1[0]**2. - 1.)*f1[0] + beta*(s1[0]**2.)*f1[0] )
+	s2[0] = 2.*s1[0] - s0[0] + (cfl/pts[0])*( (pts[0] + dr/2.)*s1[1] - 2.*pts[0]*s1[0] + (pts[0] - dr/2.)*s1[0] ) - ((dt/epsilon)**2.)*( lambda_s*(s1[0]**2. - 1.)*s1[0] + beta*(f1[0]**2.)*s1[0] + (phase**2.)/((pts[0]**2.))*s1[0] )
+
+	f2[m] = 2.*f1[m] - f0[m] + (cfl/pts[m])*( (pts[m] + dr/2.)*f1[m] - 2.*pts[m]*f1[m] + (pts[m] - dr/2.)*f1[m-1] ) - ((dt/epsilon)**2.)*( lambda_f*(f1[m]**2. - 1.)*f1[m] + beta*(s1[m]**2.)*f1[m] )
+	s2[m] = 2.*s1[m] - s0[m] + (cfl/pts[m])*( (pts[m] + dr/2.)*s1[m] - 2.*pts[m]*s1[m] + (pts[m] - dr/2.)*s1[m-1] ) - ((dt/epsilon)**2.)*( lambda_s*(s1[m]**2. - 1.)*s1[m] + beta*(f1[m]**2.)*s1[m] + (phase**2.)/((pts[m]**2.))*s1[m] )
+
+	# update
+	f.append(f2*1.)
+	s.append(s2*1.)
+	f0 = f1*1.
+	f1 = f2*1.
+	s0 = s1*1.
+	s1 = s2*1.
+	i = i + 1
+
+print "-----> Done simulation. Saving graphs. <-----"
+save_graph(pts,"test",f,s,limits=[a,b,-3,3],n=maxiter)
+

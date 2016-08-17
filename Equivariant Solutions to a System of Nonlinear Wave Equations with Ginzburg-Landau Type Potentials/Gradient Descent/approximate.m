@@ -1,0 +1,86 @@
+% initialization
+
+close;
+clear;
+
+outputPath = [pwd, '/graphs'];
+
+
+% model specification
+
+lambda_f = 2;
+lambda_s = 1;
+beta_ = 1.25;
+phase = 1;
+
+% domain and number of divisions
+
+L = 20;
+n = 2000;
+dx = (2*L)/n;
+pts = [-L:dx:L]';
+
+% initial guess
+
+initial_f = [1/15*pts];
+initial_s = [zeros(3*n/8,1); 1/5*pts(3*n/8+1:n/2) + 1; 1; -1/5*pts(n/2+2:5*n/8+1) + 1; zeros(3*n/8,1)];
+
+initial = [initial_f; initial_s];
+
+% gradient descent & evolution of R
+
+options = optimset('GradObj', 'on', 'MaxIter', 750);
+iter = 10000;
+dt = 0.00001;
+
+R = zeros(iter+2,1);
+R(1) = 1.2;
+R(2) = 1.2 - 0.0000025;
+
+[out, cost] = fminunc(@(t)(costFunction(t, L, n, lambda_f, lambda_s, beta_, phase, R(1))), initial, options);
+
+plot(pts,out(1:n+1),pts,out(n+2:end));
+print( gcf, '-dpng', fullfile( outputPath, sprintf('test_%d.png', 1) ) );
+first_f = out(1:n+1);
+first_s = out(n+2:end);
+save('/home/k3thomps/Documents/Gradient Descent/first_f.txt','first_f');
+save('/home/k3thomps/Documents/Gradient Descent/first_s.txt','first_s');
+close;
+
+initial = out;
+
+for j=2:iter+1,
+
+ [out, cost] = fminunc(@(t)(costFunction(t,L,n,lambda_f,lambda_s,beta_,phase,R(j))), initial, options);
+
+ initial = out;
+ 
+ # saves the second (f,s) - will use this to find the time derivative
+ if j ==2,
+  second_f = out(1:n+1,1);
+  second_s = out(n+2:end,1);
+  save('/home/k3thomps/Documents/Gradient Descent/second_f.txt','second_f');
+  save('/home/k3thomps/Documents/Gradient Descent/second_s.txt','second_s');
+ endif;
+
+ 
+ s0_L2 = 0;
+ for i=1:n,
+  s0_L2 = s0_L2 + (out(n+2+i)^2)*dx;
+ endfor;
+ G = (((phase/R(j))^2)*(s0_L2/cost) - 1)/R(j);
+
+ R(j+1) = 1/(1 + G*(R(j) - R(j-1)))*( 2*R(j) - R(j-1) + (dt)^2*G + G*(R(j) - R(j-1))*R(j) );
+
+ plot( pts, out(1:n+1), pts, out(n+2:end) );
+ print( gcf, '-dpng', fullfile( outputPath, sprintf('test_%d.png', j) ) ); 
+ close;
+
+endfor;
+
+plot(R,[0:dt:(iter+1)*dt]);
+print( gcf, '-dpng', fullfile( pwd, sprintf('R.png') ) );
+close;
+
+# make video code: avconv -f image2 -r 40 -i graphs/test_%d.png -vcodec libx264 test.mp4
+
